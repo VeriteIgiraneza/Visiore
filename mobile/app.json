@@ -45,7 +45,9 @@
         {
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to select receipt images."
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font"
     ],
     "scheme": "receiptscanner",
     "extra": {
