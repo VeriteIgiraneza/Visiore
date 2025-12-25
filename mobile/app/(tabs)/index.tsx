@@ -1,3 +1,4 @@
+// d/mobile/app/%28tabs%29/index.tsx
 import React, { useState, useRef } from 'react';
 import {
   View,
@@ -24,7 +25,7 @@ export default function ScanScreen() {
   const cameraRef = useRef(null);
   const router = useRouter();
 
-  // Request camera permission on mount
+  // Request camera permission on mounts
   if (!permission) {
     return <View style={styles.container}><ActivityIndicator size="large" /></View>;
   }
