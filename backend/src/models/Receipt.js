@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-// Item subdocument schema
+// Item subdocument schema    
 
 const itemSchema = new mongoose.Schema({
   name: {

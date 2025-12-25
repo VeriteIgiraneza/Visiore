@@ -60,7 +60,7 @@ export default function ScanScreen() {
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
         base64: true,
@@ -194,7 +194,7 @@ export default function ScanScreen() {
                 ) : (
                   <>
                     <Ionicons name="cloud-upload" size={24} color="white" />
-                    <Text style={styles.primaryButtonText}>Process Receipt</Text>
+                    <Text style={styles.primaryButtonText}></Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -205,7 +205,7 @@ export default function ScanScreen() {
                 disabled={isProcessing}
               >
                 <Ionicons name="refresh" size={24} color="#007AFF" />
-                <Text style={styles.secondaryButtonText}>Retake</Text>
+                <Text style={styles.secondaryButtonText}></Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
