@@ -34,9 +34,17 @@
 // module.exports = connectDB;
 
 
+const mongoose = require('mongoose');
+
 const connectDB = async () => {
-  console.log('⚠️ MongoDB temporarily disabled - using in-memory storage');
-  console.log('✅ Server ready (without database)');
+  try {
+    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    console.log(`🚀 MongoDB Connected: ${conn.connection.host}`);
+  } catch (err) {
+    console.error(`❌ MongoDB Connection Error: ${err.message}`);
+    // Exit process with failure so you know it didn't connect
+    process.exit(1);
+  }
 };
 
 module.exports = connectDB;

@@ -102,6 +102,28 @@ exports.getAllReceipts = async (req, res) => {
   }
 };
 
+// GET /api/receipts/item-history?name=Milk
+exports.getItemHistory = async (req, res) => {
+  try {
+    const { name } = req.query;
+    const receipts = await Receipt.find({ "items.name": { $regex: name, $options: 'i' } })
+      .sort({ date: 1 });
+
+    const history = receipts.map(r => {
+      const item = r.items.find(i => i.name.toLowerCase().includes(name.toLowerCase()));
+      return {
+        date: r.date,
+        price: item.price,
+        merchant: r.merchant
+      };
+    });
+
+    res.json({ success: true, data: history });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 /**
  * Get single receipt by ID
  * GET /api/receipts/:id

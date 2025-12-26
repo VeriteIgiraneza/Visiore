@@ -50,6 +50,14 @@ const TabsLayout = () => {
         }}
       />
 
+      <Tabs.Screen
+        name="insights"
+        options={{
+          title: 'Insights',
+          tabBarIcon: ({ color }) => <Ionicons name="analytics" size={24} color={color} />,
+        }}
+      />
+
 
 
 

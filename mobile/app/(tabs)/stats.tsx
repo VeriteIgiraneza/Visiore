@@ -19,7 +19,7 @@ export default function StatsScreen() {
   useEffect(() => {
     loadStats();
   }, []);
-//sd
+
   const loadStats = async () => {
     try {
       const response = await getStats();
@@ -31,12 +31,12 @@ export default function StatsScreen() {
     }
   };
 
-  const formatCurrency = (amount) => {
-    return `$${amount.toFixed(2)}`;
+  const formatCurrency = (amount: number) => {
+    return `$${(amount || 0).toFixed(2)}`;
   };
 
-  const getCategoryIcon = (category) => {
-    const icons = {
+  const getCategoryIcon = (category: string) => {
+    const icons: any = {
       Groceries: 'cart',
       Dining: 'restaurant',
       Transportation: 'car',
@@ -47,24 +47,6 @@ export default function StatsScreen() {
       Other: 'ellipsis-horizontal',
     };
     return icons[category] || 'receipt';
-  };
-
-  const getMonthName = (month) => {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return months[month - 1];
   };
 
   if (loading) {
@@ -84,279 +66,110 @@ export default function StatsScreen() {
     );
   }
 
-  const maxCategoryAmount = Math.max(
-    ...stats.categoryBreakdown.map((c) => c.total),
-    1
-  );
+  // Calculate Year-to-Date Tax (Sum of all monthly tax fields)
+  const totalTaxYTD = stats.monthlySpending?.reduce((sum: number, m: any) => sum + (m.totalTax || 0), 0) || 0;
 
   return (
     <ScrollView style={styles.container}>
-      {/* Total Spending Card */}
-      <View style={styles.totalCard}>
-        <Ionicons name="wallet" size={40} color="#007AFF" />
-        <Text style={styles.totalLabel}>Total Spending</Text>
-        <Text style={styles.totalAmount}>
-          {formatCurrency(stats.totalSpending)}
-        </Text>
+      {/* 1. Overview Summary Cards */}
+      <View style={styles.summaryContainer}>
+        <View style={styles.totalCard}>
+          <Text style={styles.totalLabel}>Total Spending</Text>
+          <Text style={styles.totalAmount}>{formatCurrency(stats.totalSpending)}</Text>
+        </View>
+        <View style={[styles.totalCard, { backgroundColor: '#FF9500' }]}>
+          <Text style={styles.totalLabel}>Total Tax YTD</Text>
+          <Text style={styles.totalAmount}>{formatCurrency(totalTaxYTD)}</Text>
+        </View>
       </View>
 
-      {/* Category Breakdown */}
+      {/* 2. Spending by Time of Day (New) */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Spending Habits by Time</Text>
+        <View style={styles.timeGrid}>
+          {['Morning', 'Afternoon', 'Evening', 'Night'].map((time) => (
+            <View key={time} style={styles.timeBox}>
+              <Text style={styles.timeLabel}>{time}</Text>
+              <Text style={styles.timeValue}>{formatCurrency(stats.timeOfDayBreakdown?.[time.toLowerCase()] || 0)}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* 3. Category Breakdown with Percentage Bars */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Spending by Category</Text>
-        {stats.categoryBreakdown.length === 0 ? (
-          <Text style={styles.noDataText}>No category data available</Text>
-        ) : (
-          stats.categoryBreakdown.map((category) => {
-            const percentage = (category.total / stats.totalSpending) * 100;
-            const barWidth = (category.total / maxCategoryAmount) * (width - 80);
-
-            return (
-              <View key={category._id} style={styles.categoryItem}>
-                <View style={styles.categoryHeader}>
-                  <View style={styles.categoryTitleContainer}>
-                    <Ionicons
-                      name={getCategoryIcon(category._id)}
-                      size={20}
-                      color="#007AFF"
-                    />
-                    <Text style={styles.categoryName}>{category._id}</Text>
-                  </View>
-                  <Text style={styles.categoryAmount}>
-                    {formatCurrency(category.total)}
-                  </Text>
+        {stats.categoryBreakdown.map((category: any) => {
+          const percentage = (category.total / stats.totalSpending) * 100;
+          return (
+            <View key={category._id} style={styles.categoryItem}>
+              <View style={styles.categoryHeader}>
+                <View style={styles.categoryTitleContainer}>
+                  <Ionicons name={getCategoryIcon(category._id)} size={20} color="#007AFF" />
+                  <Text style={styles.categoryName}>{category._id}</Text>
                 </View>
-                <View style={styles.categoryBarContainer}>
-                  <View
-                    style={[styles.categoryBar, { width: barWidth }]}
-                  />
-                </View>
-                <Text style={styles.categoryDetails}>
-                  {category.count} receipt{category.count !== 1 ? 's' : ''} •{' '}
-                  {percentage.toFixed(1)}%
-                </Text>
+                <Text style={styles.categoryAmount}>{formatCurrency(category.total)}</Text>
               </View>
-            );
-          })
-        )}
+              <View style={styles.categoryBarContainer}>
+                <View style={[styles.categoryBar, { width: `${percentage}%` }]} />
+              </View>
+            </View>
+          );
+        })}
       </View>
 
-      {/* Monthly Spending */}
+      {/* 4. Monthly Tax & Spend List */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Monthly Spending</Text>
-        {stats.monthlySpending.length === 0 ? (
-          <Text style={styles.noDataText}>No monthly data available</Text>
-        ) : (
-          stats.monthlySpending.slice(0, 6).map((month) => (
-            <View key={`${month._id.year}-${month._id.month}`} style={styles.monthItem}>
-              <View style={styles.monthInfo}>
-                <Text style={styles.monthName}>
-                  {getMonthName(month._id.month)} {month._id.year}
-                </Text>
-                <Text style={styles.monthCount}>
-                  {month.count} receipt{month.count !== 1 ? 's' : ''}
-                </Text>
-              </View>
-              <Text style={styles.monthAmount}>
-                {formatCurrency(month.total)}
-              </Text>
+        <Text style={styles.sectionTitle}>Monthly Tax Breakdown</Text>
+        {stats.monthlySpending.map((month: any) => (
+          <View key={`${month._id.year}-${month._id.month}`} style={styles.monthItem}>
+            <View>
+              <Text style={styles.monthName}>{month._id.month}/{month._id.year}</Text>
+              <Text style={styles.monthSub}>Tax: {formatCurrency(month.totalTax)}</Text>
             </View>
-          ))
-        )}
+            <Text style={styles.monthAmount}>{formatCurrency(month.total)}</Text>
+          </View>
+        ))}
       </View>
 
-      {/* Top Merchants */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Top Merchants</Text>
-        {stats.topMerchants.length === 0 ? (
-          <Text style={styles.noDataText}>No merchant data available</Text>
-        ) : (
-          stats.topMerchants.slice(0, 5).map((merchant, index) => (
-            <View key={merchant._id} style={styles.merchantItem}>
-              <View style={styles.merchantRank}>
-                <Text style={styles.rankNumber}>{index + 1}</Text>
-              </View>
-              <View style={styles.merchantInfo}>
-                <Text style={styles.merchantName}>{merchant._id}</Text>
-                <Text style={styles.merchantCount}>
-                  {merchant.count} visit{merchant.count !== 1 ? 's' : ''}
-                </Text>
-              </View>
-              <Text style={styles.merchantAmount}>
-                {formatCurrency(merchant.total)}
-              </Text>
-            </View>
-          ))
-        )}
-      </View>
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  summaryContainer: { flexDirection: 'row', padding: 10, gap: 10 },
+  totalCard: { 
+    flex: 1, 
+    backgroundColor: '#007AFF', 
+    padding: 20, 
+    borderRadius: 16, 
     alignItems: 'center',
-  },
-  totalCard: {
-    backgroundColor: '#007AFF',
-    margin: 15,
-    padding: 30,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
     elevation: 4,
-  },
-  totalLabel: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 10,
-  },
-  totalAmount: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: 'white',
-    marginTop: 5,
-  },
-  section: {
-    backgroundColor: 'white',
-    margin: 15,
-    marginTop: 0,
-    padding: 20,
-    borderRadius: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOpacity: 0.2,
+    shadowRadius: 5
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 15,
-  },
-  categoryItem: {
-    marginBottom: 20,
-  },
-  categoryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  categoryTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  categoryName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#000',
-  },
-  categoryAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  categoryBarContainer: {
-    height: 8,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 6,
-  },
-  categoryBar: {
-    height: '100%',
-    backgroundColor: '#007AFF',
-    borderRadius: 4,
-  },
-  categoryDetails: {
-    fontSize: 12,
-    color: '#666',
-  },
-  monthItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  monthInfo: {
-    flex: 1,
-  },
-  monthName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-  },
-  monthCount: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 2,
-  },
-  monthAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  merchantItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  merchantRank: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F0F0F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  rankNumber: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  merchantInfo: {
-    flex: 1,
-  },
-  merchantName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#000',
-  },
-  merchantCount: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 2,
-  },
-  merchantAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#999',
-    marginTop: 15,
-  },
-  noDataText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    paddingVertical: 20,
-  },
+  totalLabel: { fontSize: 12, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase' },
+  totalAmount: { fontSize: 22, fontWeight: 'bold', color: 'white', marginTop: 4 },
+  section: { backgroundColor: 'white', margin: 15, padding: 20, borderRadius: 12, elevation: 2 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15 },
+  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  timeBox: { width: '47%', backgroundColor: '#F8F9FA', padding: 15, borderRadius: 10 },
+  timeLabel: { fontSize: 12, color: '#666' },
+  timeValue: { fontSize: 16, fontWeight: 'bold', color: '#000' },
+  categoryItem: { marginBottom: 15 },
+  categoryHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  categoryTitleContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  categoryName: { fontSize: 14, fontWeight: '600' },
+  categoryAmount: { fontSize: 14, fontWeight: 'bold', color: '#007AFF' },
+  categoryBarContainer: { height: 6, backgroundColor: '#EEE', borderRadius: 3 },
+  categoryBar: { height: '100%', backgroundColor: '#007AFF', borderRadius: 3 },
+  monthItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  monthName: { fontSize: 15, fontWeight: '600' },
+  monthSub: { fontSize: 12, color: '#FF9500' },
+  monthAmount: { fontSize: 16, fontWeight: 'bold' },
+  emptyText: { marginTop: 15, color: '#999' }
 });

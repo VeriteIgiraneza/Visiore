@@ -117,26 +117,21 @@ export default function ScanScreen() {
   if (isCameraActive) {
     return (
       <View style={styles.container}>
-        <CameraView
-          ref={cameraRef}
-          style={styles.camera}
-          facing={'back'}
-        >
-          <View style={styles.cameraControls}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setIsCameraActive(false)}
-            >
-              <Ionicons name="close" size={32} color="white" />
+        {/* Layer 1: The Camera */}
+        <CameraView ref={cameraRef} style={styles.camera} facing={'back'} />
+        
+        {/* Layer 2: The UI Overlay (Absolute Position) */}
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <TouchableOpacity style={styles.closeButton} onPress={() => setIsCameraActive(false)}>
+            <Ionicons name="close" size={32} color="white" />
+          </TouchableOpacity>
+          
+          <View style={styles.captureButtonContainer}>
+            <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
+              <View style={styles.captureButtonInner} />
             </TouchableOpacity>
-            
-            <View style={styles.captureButtonContainer}>
-              <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
-                <View style={styles.captureButtonInner} />
-              </TouchableOpacity>
-            </View>
           </View>
-        </CameraView>
+        </View>
       </View>
     );
   }
@@ -210,6 +205,16 @@ export default function ScanScreen() {
             </View>
           </ScrollView>
         </View>
+        {/* Loading Overlay */}
+          <Modal transparent={true} visible={isProcessing} animationType="fade">
+            <View style={styles.loadingOverlay}>
+              <View style={styles.loadingCard}>
+                <ActivityIndicator size="large" color="#007AFF" />
+                <Text style={styles.loadingText}>AI is analyzing receipt...</Text>
+                <Text style={styles.loadingSubtext}>This may take a few seconds</Text>
+              </View>
+            </View>
+          </Modal>  
       </Modal>
     </View>
   );
@@ -355,5 +360,29 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingCard: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 20,
+    alignItems: 'center',
+    width: '80%',
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  loadingSubtext: {
+    marginTop: 5,
+    fontSize: 14,
+    color: '#666',
   },
 });

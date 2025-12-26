@@ -1,7 +1,7 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://100.120.80.117:3000';
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
@@ -43,8 +43,9 @@ api.interceptors.response.use(
  * @param {string} imageBase64 - Base64 encoded image
  * @returns {Promise<Object>} Receipt data
  */
-export const uploadReceipt = async (imageBase64) => {
-  const response = await api.post('/receipts/upload', { imageBase64 });
+export const uploadReceipt = async (imageBase64String) => {
+  // Changed "image" to "imageBase64" to match receiptController.js line 10
+  const response = await api.post('/receipts/upload', { imageBase64: imageBase64String });
   return response.data;
 };
 

@@ -55,7 +55,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n🚀 Server running on port ${PORT}`);
+  console.log(`Server running and accessible at http://100.120.80.117:${PORT}`);
   console.log(`📡 API: http://localhost:${PORT}`);
   console.log(`🏥 Health: http://localhost:${PORT}/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}\n`);

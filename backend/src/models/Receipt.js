@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
-// Item subdocument schema    
 
+// Item subdocument schema - Updated with UPC/SKU
 const itemSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -13,10 +13,15 @@ const itemSchema = new mongoose.Schema({
   quantity: {
     type: Number,
     default: 1
+  },
+  upc: {
+    type: String,
+    default: '' // Barcode or SKU for specific product tracking
   }
 }, { _id: false });
 
 const receiptSchema = new mongoose.Schema({
+  // --- Core Details ---
   merchant: {
     type: String,
     required: true,
@@ -26,6 +31,12 @@ const receiptSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
+  transactionTime: {
+    type: String, // HH:MM format extracted from receipt
+    default: ''
+  },
+
+  // --- Financial Details ---
   total: {
     type: Number,
     required: true,
@@ -41,14 +52,52 @@ const receiptSchema = new mongoose.Schema({
     min: 0
   },
   items: [itemSchema],
-  category: {
+
+  // --- Store Information ---
+  storeAddress: {
     type: String,
-    enum: ['Groceries', 'Dining', 'Transportation', 'Shopping', 'Healthcare', 'Entertainment', 'Utilities', 'Other'],
-    default: 'Other'
+    default: ''
+  },
+  storePhone: {
+    type: String,
+    default: ''
+  },
+  terminalId: {
+    type: String,
+    default: ''
+  },
+  cashier: {
+    type: String,
+    default: ''
+  },
+
+  // --- Transaction Metadata ---
+  receiptNumber: {
+    type: String, // Invoice or Transaction ID
+    default: ''
   },
   paymentMethod: {
     type: String,
     enum: ['Cash', 'Credit Card', 'Debit Card', 'Mobile Payment', 'Other'],
+    default: 'Other'
+  },
+  paymentCardLast4: {
+    type: String, // Last 4 digits of the card used
+    default: ''
+  },
+  AID: {
+    type: String, // EMV Application ID for card chip transactions
+    default: ''
+  },
+  authCode: {
+    type: String, // Authorization code from the bank
+    default: ''
+  },
+
+  // --- Organization ---
+  category: {
+    type: String,
+    enum: ['Groceries', 'Dining', 'Transportation', 'Shopping', 'Healthcare', 'Entertainment', 'Utilities', 'Other'],
     default: 'Other'
   },
   imageBase64: {
@@ -69,17 +118,20 @@ const receiptSchema = new mongoose.Schema({
   },
   userId: {
     type: String,
-    default: 'default_user' // For future multi-user support
+    default: 'default_user'
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
-// Indexes for faster queries
-receiptSchema.index({ merchant: 'text', notes: 'text' });
+// --- Indexes ---
+receiptSchema.index({ merchant: 'text', notes: 'text', storeAddress: 'text' });
 receiptSchema.index({ date: -1 });
 receiptSchema.index({ category: 1 });
 receiptSchema.index({ userId: 1 });
+receiptSchema.index({ receiptNumber: 1 }); // Index for searching specific receipts
 
 // Virtual for formatted date
 receiptSchema.virtual('formattedDate').get(function() {

@@ -11,12 +11,12 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getReceiptById, updateReceipt, deleteReceipt } from '../../services/api';
+import { getReceiptById, deleteReceipt } from '../../services/api';
 
 export default function ReceiptDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const [receipt, setReceipt] = useState(null);
+  const [receipt, setReceipt] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function ReceiptDetailScreen() {
 
   const loadReceipt = async () => {
     try {
-      const response = await getReceiptById(id);
+      const response = await getReceiptById(id as string);
       setReceipt(response.data);
     } catch (error) {
       Alert.alert('Error', 'Failed to load receipt');
@@ -47,7 +47,7 @@ export default function ReceiptDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteReceipt(id);
+              await deleteReceipt(id as string);
               Alert.alert('Success', 'Receipt deleted');
               router.back();
             } catch (error) {
@@ -59,7 +59,7 @@ export default function ReceiptDetailScreen() {
     );
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -69,8 +69,8 @@ export default function ReceiptDetailScreen() {
     });
   };
 
-  const formatCurrency = (amount) => {
-    return `$${amount.toFixed(2)}`;
+  const formatCurrency = (amount: number) => {
+    return `$${(amount || 0).toFixed(2)}`;
   };
 
   if (loading) {
@@ -103,7 +103,7 @@ export default function ReceiptDetailScreen() {
       {/* Main Info Card */}
       <View style={styles.card}>
         <Text style={styles.merchant}>{receipt.merchant}</Text>
-        <Text style={styles.date}>{formatDate(receipt.date)}</Text>
+        <Text style={styles.date}>{formatDate(receipt.date)} • {receipt.transactionTime || 'N/A'}</Text>
         
         <View style={styles.totalContainer}>
           <Text style={styles.totalLabel}>Total Amount</Text>
@@ -121,6 +121,81 @@ export default function ReceiptDetailScreen() {
           </View>
         </View>
       </View>
+
+      {/* Store & Payment Detail Card */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Store & Payment Info</Text>
+        
+        {receipt.storeAddress && (
+          <View style={styles.infoRow}>
+            <Ionicons name="location-outline" size={18} color="#666" />
+            <Text style={styles.infoText}>{receipt.storeAddress}</Text>
+          </View>
+        )}
+
+        {receipt.storePhone && (
+          <View style={styles.infoRow}>
+            <Ionicons name="call-outline" size={18} color="#666" />
+            <Text style={styles.infoText}>{receipt.storePhone}</Text>
+          </View>
+        )}
+        
+        <View style={styles.infoRow}>
+          <Ionicons name="receipt-outline" size={18} color="#666" />
+          <Text style={styles.infoText}>Receipt #: {receipt.receiptNumber || 'N/A'}</Text>
+        </View>
+
+        {receipt.paymentCardLast4 && (
+          <View style={styles.infoRow}>
+            <Ionicons name="card-outline" size={18} color="#666" />
+            <Text style={styles.infoText}>Card Ending In: **** {receipt.paymentCardLast4}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Technical Metadata Grid */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Transaction Metadata</Text>
+        <View style={styles.metaGrid}>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>AID</Text>
+            <Text style={styles.metaValue}>{receipt.AID || 'N/A'}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Auth Code</Text>
+            <Text style={styles.metaValue}>{receipt.authCode || 'N/A'}</Text>
+          </View>
+        </View>
+        <View style={styles.metaGrid}>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Terminal ID</Text>
+            <Text style={styles.metaValue}>{receipt.terminalId || 'N/A'}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Cashier</Text>
+            <Text style={styles.metaValue}>{receipt.cashier || 'N/A'}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Items List with UPC */}
+      {receipt.items && receipt.items.length > 0 && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Items ({receipt.items.length})</Text>
+          {receipt.items.map((item: any, index: number) => (
+            <View key={index} style={styles.itemRow}>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemName}>{item.name}</Text>
+                {item.upc ? <Text style={styles.itemUpc}>UPC: {item.upc}</Text> : null}
+                {item.quantity > 1 && (
+                  <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+                )}
+              </View>
+              <Text style={styles.itemPrice}>{formatCurrency(item.price)}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Price Breakdown */}
       <View style={styles.card}>
@@ -143,49 +218,33 @@ export default function ReceiptDetailScreen() {
         </View>
       </View>
 
-      {/* Items List */}
-      {receipt.items && receipt.items.length > 0 && (
+      {/* Notes & Tags */}
+      {(receipt.notes || (receipt.tags && receipt.tags.length > 0)) && (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Items ({receipt.items.length})</Text>
-          {receipt.items.map((item, index) => (
-            <View key={index} style={styles.itemRow}>
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                {item.quantity > 1 && (
-                  <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
-                )}
+          {receipt.notes && (
+            <>
+              <Text style={styles.cardTitle}>Notes</Text>
+              <Text style={styles.notes}>{receipt.notes}</Text>
+            </>
+          )}
+          {receipt.tags && receipt.tags.length > 0 && (
+            <View style={receipt.notes ? {marginTop: 15} : {}}>
+               <Text style={styles.cardTitle}>Tags</Text>
+               <View style={styles.tags}>
+                {receipt.tags.map((tag: string, index: number) => (
+                  <View key={index} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag}</Text>
+                  </View>
+                ))}
               </View>
-              <Text style={styles.itemPrice}>{formatCurrency(item.price)}</Text>
             </View>
-          ))}
-        </View>
-      )}
-
-      {/* Notes */}
-      {receipt.notes && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Notes</Text>
-          <Text style={styles.notes}>{receipt.notes}</Text>
-        </View>
-      )}
-
-      {/* Tags */}
-      {receipt.tags && receipt.tags.length > 0 && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Tags</Text>
-          <View style={styles.tags}>
-            {receipt.tags.map((tag, index) => (
-              <View key={index} style={styles.tag}>
-                <Text style={styles.tagText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
+          )}
         </View>
       )}
 
       {/* Delete Button */}
       <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-        <Ionicons name="trash" size={20} color="white" />
+        <Ionicons name="trash-outline" size={20} color="white" />
         <Text style={styles.deleteButtonText}>Delete Receipt</Text>
       </TouchableOpacity>
 
@@ -193,27 +252,15 @@ export default function ReceiptDetailScreen() {
     </ScrollView>
   );
 }
-//as
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  receiptImage: {
-    width: '100%',
-    height: 300,
-    backgroundColor: '#000',
-  },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  receiptImage: { width: '100%', height: 350, backgroundColor: '#000' },
   card: {
     backgroundColor: 'white',
-    margin: 15,
-    padding: 20,
+    margin: 12,
+    padding: 16,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -221,148 +268,46 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  merchant: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 5,
-  },
-  date: {
-    fontSize: 15,
-    color: '#666',
-    marginBottom: 20,
-  },
-  totalContainer: {
-    backgroundColor: '#F8F9FA',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
-  },
-  totalLabel: {
-    fontSize: 13,
-    color: '#666',
-    marginBottom: 5,
-  },
-  totalAmount: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  badges: {
-    flexDirection: 'row',
-    gap: 10,
-  },
+  merchant: { fontSize: 22, fontWeight: 'bold', color: '#000', marginBottom: 4 },
+  date: { fontSize: 14, color: '#666', marginBottom: 16 },
+  totalContainer: { backgroundColor: '#F8F9FA', padding: 12, borderRadius: 8, marginBottom: 12 },
+  totalLabel: { fontSize: 12, color: '#666' },
+  totalAmount: { fontSize: 28, fontWeight: 'bold', color: '#007AFF' },
+  badges: { flexDirection: 'row', gap: 8 },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#E3F2FD',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 16,
-    gap: 5,
+    gap: 4,
   },
-  badgeText: {
-    fontSize: 13,
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 15,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  breakdownLabel: {
-    fontSize: 15,
-    color: '#666',
-  },
-  breakdownValue: {
-    fontSize: 15,
-    color: '#000',
-    fontWeight: '500',
-  },
-  breakdownTotal: {
-    borderBottomWidth: 0,
-    paddingTop: 12,
-    marginTop: 8,
-  },
-  breakdownTotalLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  breakdownTotalValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 15,
-    color: '#000',
-    marginBottom: 2,
-  },
-  itemQuantity: {
-    fontSize: 13,
-    color: '#666',
-  },
-  itemPrice: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#000',
-  },
-  notes: {
-    fontSize: 15,
-    color: '#333',
-    lineHeight: 22,
-  },
-  tags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  tag: {
-    backgroundColor: '#F0F0F0',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  tagText: {
-    fontSize: 13,
-    color: '#333',
-  },
-  deleteButton: {
-    backgroundColor: '#FF3B30',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: 15,
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  deleteButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  bottomPadding: {
-    height: 30,
-  },
+  badgeText: { fontSize: 12, color: '#007AFF', fontWeight: '500' },
+  cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 12 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 },
+  infoText: { fontSize: 14, color: '#444', flexShrink: 1 },
+  metaGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  metaItem: { flex: 1 },
+  metaLabel: { fontSize: 11, color: '#999', textTransform: 'uppercase' },
+  metaValue: { fontSize: 14, color: '#333', fontWeight: '500' },
+  itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  itemInfo: { flex: 1 },
+  itemName: { fontSize: 14, color: '#000', fontWeight: '500' },
+  itemUpc: { fontSize: 11, color: '#888', marginTop: 2 },
+  itemQuantity: { fontSize: 12, color: '#666' },
+  itemPrice: { fontSize: 14, fontWeight: '600', color: '#000' },
+  breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
+  breakdownLabel: { fontSize: 14, color: '#666' },
+  breakdownValue: { fontSize: 14, color: '#000' },
+  breakdownTotal: { borderTopWidth: 1, borderTopColor: '#EEE', marginTop: 8, paddingTop: 8 },
+  breakdownTotalLabel: { fontSize: 16, fontWeight: 'bold' },
+  breakdownTotalValue: { fontSize: 16, fontWeight: 'bold', color: '#007AFF' },
+  notes: { fontSize: 14, color: '#444', lineHeight: 20 },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  tag: { backgroundColor: '#F0F0F0', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  tagText: { fontSize: 12, color: '#555' },
+  deleteButton: { backgroundColor: '#FF3B30', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', margin: 12, padding: 14, borderRadius: 12, gap: 8 },
+  deleteButtonText: { color: 'white', fontSize: 15, fontWeight: '600' },
+  bottomPadding: { height: 40 },
 });
