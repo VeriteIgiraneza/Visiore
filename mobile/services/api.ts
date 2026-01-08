@@ -43,10 +43,17 @@ api.interceptors.response.use(
  * @param {string} imageBase64 - Base64 encoded image
  * @returns {Promise<Object>} Receipt data
  */
-export const uploadReceipt = async (imageBase64String) => {
-  // Changed "image" to "imageBase64" to match receiptController.js line 10
-  const response = await api.post('/receipts/upload', { imageBase64: imageBase64String });
-  return response.data;
+export const uploadReceipt = async (imageBase64: string, manualType?: 'FUEL' | 'GENERAL') => {
+  try {
+    const response = await api.post('/receipts/upload', { 
+      imageBase64,
+      manualType // This matches your backend controller logic
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Upload error:', error);
+    throw error;
+  }
 };
 
 /**

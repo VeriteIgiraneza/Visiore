@@ -1,58 +1,88 @@
-// d/mobile/app/%28tabs%29/index.tsx
-import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  Image,
-  Modal,
-  ScrollView,
-} from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Alert, TouchableOpacity } from 'react-native';
+import { useCameraPermissions } from 'expo-camera';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useNavigation } from 'expo-router';
+
+// Internal Imports
 import { uploadReceipt } from '../../services/api';
-import { useRouter } from 'expo-router';
+import CameraOverlay from '../../components/scan/CameraOverlay';
+import { ImagePreview } from '../../components/scan/ImagePreview';
+import ReceiptReview from '../../components/scan/ReceiptReview';
+import LandingView from '../../components/scan/LandingView';
+import PermissionView from '../../components/scan/PermissionView';
 
 export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const [capturedImage, setCapturedImage] = useState(null);
+  const [capturedImage, setCapturedImage] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [flash, setFlash] = useState<'on' | 'off'>('off');
+  
+  const [aiResults, setAiResults] = useState({
+    storeName: '', 
+    total: '', 
+    date: '', 
+    items: []
+  });
+
   const cameraRef = useRef(null);
   const router = useRouter();
+  const navigation = useNavigation();
 
-  // Request camera permission on mounts
-  if (!permission) {
-    return <View style={styles.container}><ActivityIndicator size="large" /></View>;
+  // Handle Header dynamically
+  useEffect(() => {
+    if (isCameraActive) {
+      navigation.setOptions({
+        headerTitle: "Scan",
+        headerTitleAlign: 'center',
+        headerLeft: () => (
+          <TouchableOpacity 
+            onPress={() => setIsCameraActive(false)} 
+            style={{ marginLeft: 15 }}
+          >
+            <Ionicons name="arrow-back" size={24} color="#007AFF" />
+          </TouchableOpacity>
+        ),
+        headerRight: () => (
+          <TouchableOpacity 
+            onPress={() => setFlash(f => f === 'on' ? 'off' : 'on')} 
+            style={{ marginRight: 15 }}
+          >
+            <Ionicons name={flash === 'on' ? "flash" : "flash-off"} size={24} color="#007AFF" />
+          </TouchableOpacity>
+        ),
+      });
+    } else {
+      navigation.setOptions({
+        headerTitle: "Scan",
+        headerLeft: undefined,
+        headerRight: undefined,
+      });
+    }
+  }, [flash, isCameraActive, navigation]);
+
+  // Permission Guard
+  if (!permission?.granted) {
+    return <PermissionView onRequest={requestPermission} />;
   }
 
-  if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.permissionText}>Camera permission is required</Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Grant Permission</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // --- Logic Functions ---
 
   const takePicture = async () => {
     if (cameraRef.current) {
       try {
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.8,
-          base64: true,
+        const photo = await (cameraRef.current as any).takePictureAsync({ 
+          quality: 1,
+          shutterSound: false 
         });
         setCapturedImage(photo);
         setIsCameraActive(false);
-      } catch (error) {
-        Alert.alert('Error', 'Failed to take picture');
-        console.error(error);
+      } catch (e) {
+        Alert.alert("Error", "Failed to capture image");
       }
     }
   };
@@ -60,329 +90,89 @@ export default function ScanScreen() {
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        quality: 0.8,
-        base64: true,
+        quality: 1,
       });
 
       if (!result.canceled) {
+        // We use the first asset in the selection
         setCapturedImage(result.assets[0]);
       }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to pick image');
-      console.error(error);
+    } catch (e) {
+      Alert.alert("Error", "Failed to pick image from gallery");
     }
   };
 
-  const processReceipt = async () => {
+  // --- PLACE IT HERE ---
+  const cropAndUpload = async (type: 'FUEL' | 'GENERAL') => {
     if (!capturedImage) return;
-
     setIsProcessing(true);
     try {
-      const response = await uploadReceipt(capturedImage.base64);
-      Alert.alert(
-        'Success!',
-        `Receipt from ${response.data.merchant} saved successfully`,
-        [
-          {
-            text: 'View Receipts',
-            onPress: () => {
-              resetScreen();
-              router.push('/(tabs)/receipts');
-            },
-          },
-          {
-            text: 'Scan Another',
-            onPress: resetScreen,
-          },
-        ]
+      const cropped = await ImageManipulator.manipulateAsync(
+        capturedImage.uri,
+        [{ crop: { originX: 0, originY: capturedImage.height * 0.1, width: capturedImage.width, height: capturedImage.height * 0.8 } }],
+        { format: ImageManipulator.SaveFormat.JPEG, base64: true }
       );
-    } catch (error) {
-      Alert.alert(
-        'Error',
-        error.response?.data?.message || 'Failed to process receipt. Please try again.'
-      );
-      console.error('Upload error:', error);
+
+      const response = await uploadReceipt(cropped.base64, type);
+      
+      setAiResults({
+        storeName: response.data.merchant || '',
+        total: response.data.total?.toString() || '',
+        date: response.data.date || '',
+        items: response.data.items || []
+      });
+      
+      setCapturedImage(null);
+      setIsReviewing(true);
+    } catch (e) {
+      Alert.alert("Error", "AI Analysis failed");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const resetScreen = () => {
-    setCapturedImage(null);
-    setIsCameraActive(false);
-  };
+  // --- Render logic ---
 
+  // 1. Full Camera View Mode
   if (isCameraActive) {
-    return (
-      <View style={styles.container}>
-        {/* Layer 1: The Camera */}
-        <CameraView ref={cameraRef} style={styles.camera} facing={'back'} />
-        
-        {/* Layer 2: The UI Overlay (Absolute Position) */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <TouchableOpacity style={styles.closeButton} onPress={() => setIsCameraActive(false)}>
-            <Ionicons name="close" size={32} color="white" />
-          </TouchableOpacity>
-          
-          <View style={styles.captureButtonContainer}>
-            <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
-              <View style={styles.captureButtonInner} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
+    return <CameraOverlay cameraRef={cameraRef} flash={flash} onCapture={takePicture} />;
   }
 
+  // 2. Standard View (Landing, Preview Modal, Review Modal)
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <Ionicons name="receipt-outline" size={100} color="#007AFF" />
-        <Text style={styles.title}>Receipt Scanner</Text>
-        <Text style={styles.subtitle}>Scan your receipts to track expenses</Text>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      
+      {/* Show Landing only if we aren't previewing or reviewing */}
+      {!capturedImage && !isReviewing && (
+        <LandingView 
+          onStartScan={() => setIsCameraActive(true)} 
+          onImportImage={pickImage}
+        />
+      )}
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => setIsCameraActive(true)}
-          >
-            <Ionicons name="camera" size={24} color="white" />
-            <Text style={styles.primaryButtonText}>Take Photo</Text>
-          </TouchableOpacity>
+      {/* Modal 1: Confirm Photo and Select Type */}
+      <ImagePreview 
+        visible={!!capturedImage} 
+        image={capturedImage?.uri} // Changed imageUri to image
+        isProcessing={isProcessing} 
+        onAnalyze={(type) => cropAndUpload(type)} 
+        onRetake={() => setCapturedImage(null)} 
+      />
 
-          <TouchableOpacity style={styles.secondaryButton} onPress={pickImage}>
-            <Ionicons name="images" size={24} color="#007AFF" />
-            <Text style={styles.secondaryButtonText}>Choose from Gallery</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Preview Modal */}
-      <Modal visible={!!capturedImage} animationType="slide">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Preview Receipt</Text>
-            <TouchableOpacity onPress={resetScreen}>
-              <Ionicons name="close" size={28} color="#000" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalContent}>
-            {capturedImage && (
-              <Image
-                source={{ uri: capturedImage.uri }}
-                style={styles.previewImage}
-                resizeMode="contain"
-              />
-            )}
-
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={[styles.primaryButton, { flex: 1 }]}
-                onPress={processReceipt}
-                disabled={isProcessing}
-              >
-                {isProcessing ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <>
-                    <Ionicons name="cloud-upload" size={24} color="white" />
-                    <Text style={styles.primaryButtonText}></Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.secondaryButton, { flex: 1 }]}
-                onPress={resetScreen}
-                disabled={isProcessing}
-              >
-                <Ionicons name="refresh" size={24} color="#007AFF" />
-                <Text style={styles.secondaryButtonText}></Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
-        {/* Loading Overlay */}
-          <Modal transparent={true} visible={isProcessing} animationType="fade">
-            <View style={styles.loadingOverlay}>
-              <View style={styles.loadingCard}>
-                <ActivityIndicator size="large" color="#007AFF" />
-                <Text style={styles.loadingText}>AI is analyzing receipt...</Text>
-                <Text style={styles.loadingSubtext}>This may take a few seconds</Text>
-              </View>
-            </View>
-          </Modal>  
-      </Modal>
+      {/* Modal 2: Edit/Confirm AI Data */}
+      <ReceiptReview 
+        visible={isReviewing} 
+        data={aiResults} 
+        setData={setAiResults} 
+        onSave={() => {
+          Alert.alert("Success", "Receipt saved successfully!");
+          setIsReviewing(false);
+          router.push('/(tabs)/receipts');
+        }}
+        onCancel={() => setIsReviewing(false)}
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000',
-    marginTop: 20,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 10,
-    textAlign: 'center',
-  },
-  buttonContainer: {
-    width: '100%',
-    marginTop: 40,
-    gap: 15,
-  },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 10,
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    backgroundColor: 'white',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    gap: 10,
-  },
-  secondaryButtonText: {
-    color: '#007AFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  camera: {
-    flex: 1,
-  },
-  cameraControls: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 25,
-    padding: 10,
-  },
-  captureButtonContainer: {
-    position: 'absolute',
-    bottom: 40,
-    alignSelf: 'center',
-  },
-  captureButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 4,
-    borderColor: '#007AFF',
-  },
-  captureButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#007AFF',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  modalContent: {
-    flex: 1,
-    padding: 20,
-  },
-  previewImage: {
-    width: '100%',
-    height: 400,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 20,
-  },
-  permissionText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingCard: {
-    backgroundColor: 'white',
-    padding: 30,
-    borderRadius: 20,
-    alignItems: 'center',
-    width: '80%',
-  },
-  loadingText: {
-    marginTop: 15,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  loadingSubtext: {
-    marginTop: 5,
-    fontSize: 14,
-    color: '#666',
-  },
-});

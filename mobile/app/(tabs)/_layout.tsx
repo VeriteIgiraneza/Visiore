@@ -2,67 +2,73 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-//s
-
-const TabsLayout = () => {
+export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#007AFF',
         tabBarInactiveTintColor: '#8E8E93',
-        headerStyle: {
-          backgroundColor: '#007AFF',
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopWidth: 1,
+          borderTopColor: '#E5E5E5',
+          // Removed manual height to let Safe Area handle the home bar
         },
-        headerTintColor: '#fff',
+        headerStyle: {
+          backgroundColor: '#fff',
+        },
         headerTitleStyle: {
           fontWeight: 'bold',
         },
       }}
     >
+      {/* 1. Scan Tab (The Index) */}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Scan',
-          headerTitle: 'Scan Receipt',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="camera" size={size} color={color} />
+          tabBarLabel: 'Scan',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'camera' : 'camera-outline'} size={24} color={color} />
           ),
         }}
       />
+
+      {/* 2. Receipts Tab (The List) */}
       <Tabs.Screen
         name="receipts"
         options={{
-          title: 'Receipts',
-          headerTitle: 'My Receipts',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="receipt" size={size} color={color} />
+          title: 'My Receipts',
+          tabBarLabel: 'History',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={24} color={color} />
           ),
         }}
       />
+
+      {/* 3. Stats Tab (Analytics) */}
       <Tabs.Screen
         name="stats"
         options={{
-          title: 'Stats',
-          headerTitle: 'Statistics',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="stats-chart" size={size} color={color} />
+          title: 'Spending Stats',
+          tabBarLabel: 'Stats',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'stats-chart' : 'stats-chart-outline'} size={24} color={color} />
           ),
         }}
       />
 
+      {/* 4. Insights Tab (New: Price Tracker) */}
       <Tabs.Screen
         name="insights"
         options={{
-          title: 'Insights',
-          tabBarIcon: ({ color }) => <Ionicons name="analytics" size={24} color={color} />,
+          title: 'Price Insights',
+          tabBarLabel: 'Insights',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'analytics' : 'analytics-outline'} size={24} color={color} />
+          ),
         }}
       />
-
-
-
-
-
     </Tabs>
   );
-}   
-export default TabsLayout;
+}
